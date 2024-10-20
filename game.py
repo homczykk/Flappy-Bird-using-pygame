@@ -21,14 +21,19 @@ class Bird(pygame.sprite.Sprite):
         self.image = self.sprites[int(self.animation_index)]
         
     def collision(self):
+        global is_active
         if pygame.sprite.spritecollide(player_group.sprite, pipes_group, False):
-            pygame.quit()
-            exit()
+            is_active = False
 
     def apply_gravity(self):
+        global is_active, is_idle
+        if not is_active and is_idle:
+            self.gravity = 0
         self.gravity += 0.75
         self.rect.centery += self.gravity
-        self.apply_jump()
+
+        if self.rect.centery >= RESOLUTION[1] + 100: 
+            self.rect.centery = RESOLUTION[1] + 100
 
     def apply_jump(self):        
         keys = pygame.key.get_just_pressed()
@@ -40,74 +45,117 @@ class Bird(pygame.sprite.Sprite):
         pass
     
     def hit_the_ground(self):
+        global is_active
         if self.rect.colliderect(ground_rect_1) or self.rect.colliderect(ground_rect_2):
-            print("you hit the ground")
+            is_active = False
     
     def update(self):
         self.collision()
         self.animation()
-        self.apply_gravity()
-        self.apply_jump()
+        global is_idle
+        if not is_idle:
+            self.apply_gravity()
+        global is_active
+        if is_active:
+            self.apply_jump()
         self.hit_the_ground()
 
 class Up_Pipe(pygame.sprite.Sprite):
-    def __init__(self, center_offset):
+    def __init__(self, center_offset, deafult_x_pos):
         super().__init__()
         self.image = pygame.image.load('assets/sprites/up_pipe.png').convert_alpha()
         self.gap_offset = 230
         self.center_offset = center_offset
-        self.rect = self.image.get_rect(center = (RESOLUTION[0]/2, RESOLUTION[1]/2 + self.center_offset))
+        self.deafult_x_pos = deafult_x_pos
+        self.rect = self.image.get_rect(center = (self.deafult_x_pos, RESOLUTION[1]/2 + self.center_offset))
         self.rect.bottom = self.rect.bottom - self.gap_offset
         
-        self.movement_speed = 3
-
+        self.movement_speed = 4
     def movement(self):
-        self.rect.centerx -= self.movement_speed
+        global is_idle
+
+        if not is_idle:
+            self.rect.centerx -= self.movement_speed
 
         if self.rect.centerx <= -80:
             self.rect.centerx = 880
 
+    def go_back(self):
+        self.rect.centerx += self.movement_speed*3
+
+        if self.rect.centerx >= self.deafult_x_pos:
+            self.rect.centerx = self.deafult_x_pos
+
     def update(self):
-        self.movement()
+        global is_active
+        if is_active:
+            self.movement()
+        else:
+            self.go_back()
 
 class Down_Pipe(pygame.sprite.Sprite):
-    def __init__(self, center_offset):
+    def __init__(self, center_offset, deafult_x_pos):
         super().__init__()
         self.image = pygame.image.load('assets/sprites/down_pipe.png').convert_alpha()
         self.gap_offset = 230
         self.center_offset = center_offset
-        self.rect = self.image.get_rect(center = (RESOLUTION[0]/2, RESOLUTION[1]/2 + self.center_offset))
+        self.deafult_x_pos = deafult_x_pos
+        self.rect = self.image.get_rect(center = (self.deafult_x_pos, RESOLUTION[1]/2 + self.center_offset))
         self.rect.top = self.rect.top + self.gap_offset
 
-        self.movement_speed = 3
+        self.movement_speed = 4
+
 
     def movement(self):
-        self.rect.centerx -= self.movement_speed
+        global is_idle
+
+        if not is_idle:
+            self.rect.centerx -= self.movement_speed
 
         if self.rect.centerx <= -80:
             self.rect.centerx = 880
 
+    def go_back(self):
+        self.rect.centerx += self.movement_speed*3
+
+        if self.rect.centerx >= self.deafult_x_pos:
+            self.rect.centerx = self.deafult_x_pos
+
     def update(self):
-        self.movement()
+        global is_active
+        if is_active:
+            self.movement()
+        else:
+            self.go_back()
 
 class Score_Zone(pygame.sprite.Sprite):
-    def __init__(self, center_offset):
+    def __init__(self, center_offset, deafult_x_pos):
         super().__init__()
-        self.image = pygame.Surface((1,100))
+        self.image = pygame.Surface((10,100))
         self.image.fill("black")
         self.image.set_colorkey("black")
         self.center_offset = center_offset
-        self.x_offset = 50
-        self.rect = self.image.get_rect(center = (RESOLUTION[0]/2 + self.x_offset, RESOLUTION[1]/2 + self.center_offset))
-        self.movement_speed = 3
-        
+        self.deafult_x_pos = deafult_x_pos
+        self.rect = self.image.get_rect(center = (self.deafult_x_pos, RESOLUTION[1]/2 + self.center_offset))
+        self.movement_speed = 4
+
         self.scored = False
     
     def movement(self):
-        self.rect.centerx -= self.movement_speed 
+        global is_idle
+
+        if not is_idle:
+            self.rect.centerx -= self.movement_speed 
 
         if self.rect.centerx <= -80:
             self.rect.centerx = 880
+            self.scored = False
+
+    def go_back(self):
+        self.rect.centerx += self.movement_speed*3
+
+        if self.rect.centerx >= self.deafult_x_pos:
+            self.rect.centerx = self.deafult_x_pos
             self.scored = False
             
     def score(self):
@@ -132,11 +180,15 @@ class Score_Zone(pygame.sprite.Sprite):
         window.blit(points_list[digits[2]], (score_x_pos + 48, 50))
 
     def update(self):
-        self.movement()
-        self.score()
+        global is_active
+        if is_active:
+            self.movement()
+            self.score()
+        else:
+            self.go_back()
 
 def calculate_offset():
-    return random.randint(-5, 5)*10
+    return random.randint(-10, 5)*10
 
 def moving_landscape():
     ground_rect_1.centerx -= 3
@@ -178,6 +230,14 @@ ground_surf = pygame.image.load('assets/sprites/ground.png').convert()
 ground_rect_1 = ground_surf.get_rect(center = ((400, 600)))
 ground_rect_2 = ground_surf.get_rect(center = ((1200, 600)))
 
+title_surf = pygame.image.load('assets/sprites/title.png').convert_alpha()
+title_rect = title_surf.get_rect(center = (RESOLUTION[0]*2/3, RESOLUTION[1]/2))
+title_alpha = 0
+
+game_over_surf = pygame.image.load('assets/sprites/game_over.png').convert_alpha()
+game_over_rect = game_over_surf.get_rect(center = (RESOLUTION[0]/2, RESOLUTION[1]/2))
+game_over_alpha = 0
+
 player_group = pygame.sprite.GroupSingle()
 player = Bird()
 player_group.add(player)
@@ -192,29 +252,39 @@ score_zone_list = []
 for i in range(4):
     offset = calculate_offset()
 
-    up_pipes_list.append(Up_Pipe(offset))
-    down_pipes_list.append(Down_Pipe(offset))
-    score_zone_list.append(Score_Zone(offset))
-
-for i in range(4):
-    if i == 0:
-        pass
-    else: 
-        up_pipes_list[i].rect.centerx = up_pipes_list[i-1].rect.centerx + 240
-        down_pipes_list[i].rect.centerx = down_pipes_list[i-1].rect.centerx + 240
-        score_zone_list[i].rect.centerx = score_zone_list[i-1].rect.centerx + 240
+    up_pipes_list.append(Up_Pipe(offset, 880 + i*240))
+    down_pipes_list.append(Down_Pipe(offset, 880 + i*240))
+    score_zone_list.append(Score_Zone(offset, 880 + i*240))
 
     pipes_group.add(up_pipes_list[i])
     pipes_group.add(down_pipes_list[i])
     score_zone_group.add(score_zone_list[i])
-    
+
 score = 0
+is_idle = True
+is_active = True
 
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             exit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_w:
+                player.gravity = 0
+                is_idle = False
+            if event.key == pygame.K_r and not is_active:
+                is_ready = 0
+                for i in range(4):
+                    if up_pipes_list[i].rect.centerx == up_pipes_list[i].deafult_x_pos:
+                        is_ready += 1
+                if is_ready == 4:
+                    score = 0
+                    is_active = True
+                    is_idle = True
+                    player.rect.center = (RESOLUTION[0]*1/4, RESOLUTION[1]/2)
+                else:
+                    is_ready = 0
 
     for i in range(4):
         if up_pipes_list[i].rect.centerx == 880:
@@ -227,8 +297,25 @@ while True:
             down_pipes_list[i].rect.top = down_pipes_list[i].rect.top + down_pipes_list[i].gap_offset
             
             score_zone_list[i].rect.centery = RESOLUTION[1]/2 + offset
-            
+
     moving_landscape()
+
+    if is_idle:
+        title_alpha += 5
+        if title_alpha >= 255: title_alpha = 255
+        title_surf.set_alpha(title_alpha)
+        window.blit(title_surf, title_rect)
+    else:
+        title_alpha -= 5
+        if title_alpha < 0: title_alpha = 0
+        title_surf.set_alpha(title_alpha)
+        window.blit(title_surf, title_rect)
+
+    if not is_active:
+        game_over_alpha += 5
+        if game_over_alpha >= 255: game_over_alpha = 255
+        game_over_surf.set_alpha(game_over_alpha)
+        window.blit(game_over_surf, game_over_rect)
 
     player_group.draw(window)
     player_group.update()
